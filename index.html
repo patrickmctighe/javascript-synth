@@ -7,9 +7,38 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="waves">  <p>Waveform</p> <input type="range" min="0" max="3" value="0" class="waveform-slider"></div>
+    <div class="volume">
+        <p>Volume: <span class="volume-value"></span></p>
+        <input type="range" min="0" max="1" step="0.01" value="1" class="volume-slider">
+    </div>
+    <div class="waves">
+        <p>Waveform: <span class="wave-value"></span></p>
+        <input type="range" min="0" max="3" value="0" class="waveform-slider">
+    </div>
 
-    <div class="width">  <p>Width</p> <input type="range" min="0" max="100" value="0" class="width-slider"></div>
+    <div class="width">
+        <p>Width: <span class="width-value"></span></p>
+        <input type="range" min="0" max="100" value="0" class="width-slider">
+    </div>
+
+    <div class="adsr">
+        <div class="attack">
+            <p>Attack: <span class="attack-value"></span></p>
+            <input type="range" min="0" max="1" step="0.01" value="0.5" class="attack-slider">
+        </div>
+        <div class="decay">
+            <p>Decay: <span class="decay-value"></span></p>
+            <input type="range" min="0" max="1" step="0.01" value="0.5" class="decay-slider">
+        </div>
+        <div class="sustain">
+            <p>Sustain: <span class="sustain-value"></span></p>
+            <input type="range" min="0" max="1" step="0.01" value="0.5" class="sustain-slider">
+        </div>
+        <div class="release">
+            <p>Release: <span class="release-value"></span></p>
+            <input type="range" min="0" max="1" step="0.01" value="0.5" class="release-slider">
+        </div>
+    </div>
 
     <div class="keyboard">
         <button class="noteKey" data-note="c-4">C-4</button>
@@ -28,6 +57,6 @@
     </div>
     
 
-    <script src="synth.js"></script>
+    <script  src="synthMain.js"></script>
 </body>
 </html>
