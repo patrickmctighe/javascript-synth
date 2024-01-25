@@ -12,6 +12,8 @@ const attackSlider = document.querySelector(".attack-slider");
 const decaySlider = document.querySelector(".decay-slider");
 const sustainSlider = document.querySelector(".sustain-slider");
 const releaseSlider = document.querySelector(".release-slider");
+const frequencySlider = document.querySelector(".frequency-slider");
+const qSlider = document.querySelector(".q-slider");
 
 let curVolume = document.querySelector(".volume-value");
 let curWave = document.querySelector(".wave-value");
@@ -20,6 +22,8 @@ let curAttack = document.querySelector(".attack-value");
 let curDecay = document.querySelector(".decay-value");
 let curSustain = document.querySelector(".sustain-value");
 let curRelease = document.querySelector(".release-value");
+let curFrequency = document.querySelector(".frq-value");
+let curQ = document.querySelector(".q-value");
 
 
 let attack = attackSlider.value;
@@ -96,6 +100,14 @@ releaseSlider.addEventListener('input', function() {
     curRelease.innerHTML = this.value;
 });
 
+frequencySlider.addEventListener('input', function() {
+   
+    curFrequency.innerHTML = this.value;
+});
+qSlider.addEventListener('input', function() {
+    curQ.innerHTML = this.value;
+});
+
 const noteOn = (note) => {
     console.log('noteOn function called');
     const freq = notes[note];
@@ -110,7 +122,12 @@ const noteOn = (note) => {
         osc.frequency.value = freq;
         console.log('detune:', detuneValues[index]);
         osc.detune.value = detuneValues[index]; 
-        osc.connect(gainNode).connect(actx.destination);
+        const maxFilterFreq = actx.sampleRate / 2;
+        const filter = actx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = frequencySlider.value * maxFilterFreq;
+        filter.Q.value = qSlider.value * 30;
+        osc.connect(filter).connect(gainNode).connect(actx.destination);
         console.log('oscillator connected to gain node and destination');
 
         osc.start();
