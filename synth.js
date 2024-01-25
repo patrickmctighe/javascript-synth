@@ -1,7 +1,15 @@
-
 const waveforms = ["sine", "square", "sawtooth", "triangle"];
 
-const slider = document.querySelector(".waveform-slider");
+let noteWidth = 0;
+const oscBank = new Array(3)
+
+const waveSlider = document.querySelector(".waveform-slider");
+const widthSlider = document.querySelector(".width-slider");
+
+// Add event listener to update noteWidth
+widthSlider.addEventListener('input', function() {
+    noteWidth = Number(this.value);
+});
 
 const notes = {
     "c-4":261.626,
@@ -19,35 +27,46 @@ const notes = {
     "a#4":466.164
 }
 
+let osc;
+let actx = new (AudioContext || webkitAudioContext)();
+
+const createOscillators = (freq, detune)=> {
+    osc = actx.createOscillator();
+    osc.type = waveforms[waveSlider.value];
+    osc.frequency.value = freq;
+    osc.detune.value = detune;
+    osc.connect(actx.destination);
+    osc.start();
+    return osc;
+}
+
+const noteOn = (note)=> {
+    const freq = notes[note];
+    oscBank[0] = createOscillators(freq, 0);
+    oscBank[1] = createOscillators(freq, -noteWidth);
+    oscBank[2] = createOscillators(freq, noteWidth);
+}
+
 document.querySelectorAll("button[data-note]").forEach((button)=> {
-    button.addEventListener("click", function() {
+    button.addEventListener("mousedown", function() {
         const note = this.dataset.note;
-        const actx = new (AudioContext || webkitAudioContext)();
         if (!actx) throw "Not supported :(";
-        const osc = actx.createOscillator();
-        const gainNode = actx.createGain();
+        noteOn(note);
+    })
+    button.addEventListener("mouseup", stopSound);
+    button.addEventListener("mouseleave", stopSound);
+});
 
-        osc.type = waveforms[slider.value];
-        osc.frequency.value = notes[note];
-        osc.connect(gainNode)
-        gainNode.connect(actx.destination);
-        gainNode.gain.value =0.1;
-
-        osc.start();
-        osc.stop(actx.currentTime + 1);
-    });})
-
-
-
-
+function stopSound() {
+    oscBank.forEach((osc, index) => {
+        if(osc) {
+            osc.stop();
+            oscBank[index] = null;
+        }
+    })
+}
 
 
-
-
-
-
-
-    
 // }).addEventListener("click", function() {
 // const actx = new (AudioContext || webkitAudioContext)();
 // if (!actx) throw "Not supported :(";
