@@ -14,6 +14,10 @@ const sustainSlider = document.querySelector(".sustain-slider");
 const releaseSlider = document.querySelector(".release-slider");
 const frequencySlider = document.querySelector(".frequency-slider");
 const qSlider = document.querySelector(".q-slider");
+const timeSlider = document.querySelector(".time-slider");
+const feedbackSlider = document.querySelector(".feedback-slider");
+const maxDurationSlider = document.querySelector(".maxDuration-slider");
+
 
 let curVolume = document.querySelector(".volume-value");
 let curWave = document.querySelector(".wave-value");
@@ -24,6 +28,9 @@ let curSustain = document.querySelector(".sustain-value");
 let curRelease = document.querySelector(".release-value");
 let curFrequency = document.querySelector(".frq-value");
 let curQ = document.querySelector(".q-value");
+let curTime = document.querySelector(".time-value");
+let curFeedback = document.querySelector(".feedback-value");
+let curMaxDuration = document.querySelector(".maxDuration-value");
 
 
 let attack = attackSlider.value;
@@ -33,6 +40,9 @@ let release = releaseSlider.value;
 const ADSR = {attack, decay, sustain, release};
 let stageTime = 2;
 
+let time = parseFloat(timeSlider.value);
+let feedback = parseFloat(feedbackSlider.value);
+let maxDuration = parseFloat(maxDurationSlider.value);
 
 const notes = {
     "c-4":261.626,
@@ -107,6 +117,18 @@ frequencySlider.addEventListener('input', function() {
 qSlider.addEventListener('input', function() {
     curQ.innerHTML = this.value;
 });
+timeSlider.addEventListener('input', function() {
+    time = parseFloat(this.value);
+    curTime.innerHTML = this.value;
+});
+feedbackSlider.addEventListener('input', function() {
+    feedback = parseFloat(this.value);
+    curFeedback.innerHTML = this.value;
+});
+maxDurationSlider.addEventListener('input', function() {
+    maxDuration = parseFloat(this.value);
+    curMaxDuration.innerHTML = this.value;
+});
 
 const noteOn = (note) => {
     console.log('noteOn function called');
@@ -127,6 +149,20 @@ const noteOn = (note) => {
         filter.type = "lowpass";
         filter.frequency.value = frequencySlider.value * maxFilterFreq;
         filter.Q.value = qSlider.value * 30;
+        const echo = {
+            time,
+            feedback,
+            maxDuration
+        };
+        const delayNode = actx.createDelay();
+        delayNode.delayTime.value = echo.time * maxDuration;
+        delayNode.connect(actx.destination);
+        const gainNode = actx.createGain();
+        gainNode.gain.value = echo.feedback;
+        osc.connect(delayNode);
+        delayNode.connect(gainNode);
+        gainNode.connect(delayNode);
+        delayNode.connect(gainNode).connect(actx.destination);
         osc.connect(filter).connect(gainNode).connect(actx.destination);
         console.log('oscillator connected to gain node and destination');
 
