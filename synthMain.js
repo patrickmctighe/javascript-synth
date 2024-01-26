@@ -2,6 +2,12 @@
 
 const waveforms = ["sine", "square", "sawtooth", "triangle"];
 
+let echo = {
+    feedback: 0.5, // default value
+    time: 0.5, // default value
+    maxDuration: 1 // default value
+};
+
 let noteWidth = 0;
 const oscBank = new Array(3).fill(null);
 
@@ -38,7 +44,7 @@ let decay = decaySlider.value;
 let sustain = sustainSlider.value;
 let release = releaseSlider.value;
 const ADSR = {attack, decay, sustain, release};
-let stageTime = 2;
+let stageTime = 10;
 
 let time = parseFloat(timeSlider.value);
 let feedback = parseFloat(feedbackSlider.value);
@@ -60,6 +66,54 @@ const notes = {
     "a#4":466.164
 }
 
+const keyNoteMap = {
+    'a': 'c-4',
+    's': 'd-4',
+    'd': 'e-4',
+    'f': 'f-4',
+    'z': 'g-4',
+    'x': 'a-4',
+    'c': 'b-4',
+    'v': 'c-5',
+    'q': 'c#4',
+    'w': 'd#4',
+    'e': 'f#4',
+    'r': 'g#4',
+    't': 'a#4'
+
+
+};
+
+// Keep track of which keys are currently being pressed
+const keysBeingPressed = {};
+console.log('keysBeingPressed:', keysBeingPressed);
+
+// Listen for keydown events
+window.addEventListener('keydown', function(event) {
+    const note = keyNoteMap[event.key];
+    if (note && !keysBeingPressed[event.key]) {
+        // This key was not already being pressed, so start the sound
+        keysBeingPressed[event.key] = true;
+        const button = document.querySelector(`button[data-note="${note}"]`);
+        if (button) {
+            button.dispatchEvent(new Event('mousedown'));
+        }
+    }
+});
+
+// Listen for keyup events
+window.addEventListener('keyup', function(event) {
+    const note = keyNoteMap[event.key];
+    if (note) {
+        // This key is no longer being pressed, so stop the sound
+        keysBeingPressed[event.key] = false;
+        const button = document.querySelector(`button[data-note="${note}"]`);
+        if (button) {
+            button.dispatchEvent(new Event('mouseup'));
+        }
+    }
+});
+
 let osc;
 let actx;
 try {
@@ -73,9 +127,11 @@ try {
 
 let gainNode = actx.createGain();
 
-volumeSlider.addEventListener('input', function() {
-    gainNode.gain.value = this.value;
-    curVolume.innerHTML = this.value;
+volumeSlider.addEventListener('input', function () {
+    const maxVolume = parseFloat(volumeSlider.max);
+    const volume = parseFloat(this.value) / maxVolume;
+    gainNode.gain.value = volume;
+    console.log('New gain value:', gainNode.gain.value);
 });
 
 waveSlider.addEventListener('input', function() {
@@ -136,36 +192,48 @@ const noteOn = (note) => {
     const detuneValues = [0, -noteWidth, noteWidth];
 
     console.log('oscBank:', oscBank);
-    oscBank.forEach((_, index) => {
+    oscBank.forEach((oscillator, index) => {
+        if (oscillator) {
+            // Stop the previous oscillator before creating a new one
+            oscillator.stop();
+            oscillator.disconnect();
+        }
+
         const osc = actx.createOscillator();
         console.log('waveSlider.value:', waveSlider.value);
         osc.type = waveforms[waveSlider.value];
         console.log('freq:', freq);
         osc.frequency.value = freq;
         console.log('detune:', detuneValues[index]);
-        osc.detune.value = detuneValues[index]; 
+        osc.detune.value = detuneValues[index];
+
         const maxFilterFreq = actx.sampleRate / 2;
         const filter = actx.createBiquadFilter();
         filter.type = "lowpass";
         filter.frequency.value = frequencySlider.value * maxFilterFreq;
         filter.Q.value = qSlider.value * 30;
-        const echo = {
-            time,
-            feedback,
-            maxDuration
-        };
+
         const delayNode = actx.createDelay();
         delayNode.delayTime.value = echo.time * maxDuration;
-        delayNode.connect(actx.destination);
-        const gainNode = actx.createGain();
-        gainNode.gain.value = echo.feedback;
-        osc.connect(delayNode);
-        delayNode.connect(gainNode);
-        gainNode.connect(delayNode);
-        delayNode.connect(gainNode).connect(actx.destination);
-        osc.connect(filter).connect(gainNode).connect(actx.destination);
-        console.log('oscillator connected to gain node and destination');
 
+        osc.connect(filter);
+        filter.connect(gainNode);
+
+        if (feedback > 0) {
+            const feedbackGainNode = actx.createGain();
+            const maxFeedbackVolume = gainNode.gain.value * volumeSlider.value;
+            feedbackGainNode.gain.value = feedback * maxFeedbackVolume;
+
+            filter.connect(feedbackGainNode);
+            feedbackGainNode.connect(delayNode);
+            feedbackGainNode.connect(actx.destination);
+            delayNode.connect(feedbackGainNode);
+        } else {
+            filter.connect(delayNode);
+            delayNode.connect(actx.destination);
+        }
+
+        console.log('oscillator connected to filter, feedbackGainNode, and destination');
         osc.start();
         console.log('oscillator started');
         gainNode.gain.cancelScheduledValues(actx.currentTime);
@@ -174,18 +242,25 @@ const noteOn = (note) => {
         const atkDuration = ADSR.attack * stageTime;
         const atkEnd = now + atkDuration;
         const decDuration = ADSR.decay * stageTime;
+        const decEnd = atkEnd + decDuration;
         const susDuration = ADSR.sustain * stageTime;
+        const susEnd = decEnd + susDuration;
         const relDuration = ADSR.release * stageTime;
+        
+        const volume = gainNode.gain.value * volumeSlider.value;
+        
+        // Apply the volume only once outside the loop
+        if (index === 0) {
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(volume, atkEnd);
+            gainNode.gain.linearRampToValueAtTime(ADSR.sustain * volume, decEnd);
+            gainNode.gain.linearRampToValueAtTime(0, susEnd + relDuration);
+        }
 
-        gainNode.gain.setValueAtTime(0 , now);
-        gainNode.gain.linearRampToValueAtTime(1, atkEnd);
-        gainNode.gain.linearRampToValueAtTime(ADSR.sustain, atkEnd + decDuration);
-        gainNode.gain.linearRampToValueAtTime(0, atkEnd + decDuration + susDuration + relDuration);
         console.log('ADSR values applied to gain node');
         oscBank[index] = osc;
     });
 }
-
 document.querySelectorAll("button[data-note]").forEach((button) => {
     button.addEventListener("mousedown", function () {
         console.log('mousedown event triggered');
@@ -194,7 +269,7 @@ document.querySelectorAll("button[data-note]").forEach((button) => {
         
         actx.resume().then(() => {
             
-            noteOn(note); // Call noteOn with the frequency
+            noteOn(note); 
             console.log(notes[note]);
             console.log(actx.state)
         });
@@ -211,12 +286,12 @@ function stopSound() {
     oscBank.forEach((osc, index) => {
         if(osc) {
             // Start the release phase
-            gainNode.gain.cancelScheduledValues(now);
+            const releaseEnd = now + releaseTime;
             gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+            gainNode.gain.linearRampToValueAtTime(0.001, releaseEnd);
 
             // Stop the oscillator after the release phase
-            osc.stop(now + releaseTime);
+            osc.stop(releaseEnd);
             oscBank[index] = null;
         }
     });
